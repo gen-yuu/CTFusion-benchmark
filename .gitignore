@@ -15,6 +15,7 @@ venv/
 # Results 
 results/
 *.csv
+*.log
 
 # その他
 .DS_Store

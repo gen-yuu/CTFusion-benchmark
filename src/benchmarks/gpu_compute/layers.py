@@ -36,7 +36,7 @@ class LayerFactory:
                 - inputs: モジュールに渡す入力データ（単一テンソルまたはタプル）
         """
         try:
-            logger.info(
+            logger.debug(
                 f"Creating layer '{layer_type}'"
                 f"with batch_size={batch_size}, dtype={dtype}"
             )

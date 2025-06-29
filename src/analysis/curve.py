@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Dict
 
+import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -43,10 +44,13 @@ def calculate_4_metrics(group_df: pd.DataFrame) -> Dict[str, Any]:
         }
 
     # --- 4指標の計算 ---
+    # レイテンシ (latency)
     bs1_row = valid_df[valid_df["batch_size"] == 1]
     latency = bs1_row.iloc[0]["latency_sec"] if not bs1_row.empty else -1.0
+    # ピークスループット (peak_throughput)
     peak_throughput = valid_df["throughput_items_per_sec"].max()
-    # ピークの90%のスループットを最初に超えたバッチサイズ
+
+    # 飽和点 (saturation_point)
     try:
         saturation_threshold = peak_throughput * 0.9
         saturation_row = valid_df[
@@ -56,17 +60,42 @@ def calculate_4_metrics(group_df: pd.DataFrame) -> Dict[str, Any]:
     except IndexError:
         saturation_point = "N/A"
 
-    # 最初の2点間のスループットの傾きで近似する
+    # 効率の傾き (efficiency_slope)
+    efficiency_slope = "N/A"
     if len(valid_df) >= 2:
-        p1 = valid_df.iloc[0]
-        p2 = valid_df.iloc[1]
-        delta_throughput = (
-            p2["throughput_items_per_sec"] - p1["throughput_items_per_sec"]
-        )
-        delta_batch = p2["batch_size"] - p1["batch_size"]
-        efficiency_slope = delta_throughput / delta_batch if delta_batch > 0 else -1.0
-    else:
-        efficiency_slope = "N/A"
+        try:
+            # ピークスループットを最初に達成した点のインデックス位置を取得
+            # idxmax() はインデックス"ラベル"を返すので、.index.get_loc() で整数位置に変換
+            peak_idx_label = valid_df["throughput_items_per_sec"].idxmax()
+            peak_idx_pos = valid_df.index.get_loc(peak_idx_label)
+
+            # 最初の点からピークの点までの全てのデータ点を回帰の対象とする
+            regression_df = valid_df.iloc[0 : peak_idx_pos + 1]
+
+            # 回帰には最低2つの異なる点が必要
+            if (
+                len(regression_df) >= 2
+                and len(regression_df["batch_size"].unique()) >= 2
+            ):
+                x = regression_df["batch_size"]
+                y = regression_df["throughput_items_per_sec"]
+
+                # 線形回帰で傾きを計算
+                slope, _ = np.polyfit(x, y, 1)
+                efficiency_slope = slope
+            else:
+                # ピークが最初の点だった場合は、傾きは実質的に0
+                efficiency_slope = 0.0
+
+        except (np.linalg.LinAlgError, ValueError) as e:
+            logger.warning(
+                "Could not calculate efficiency_slope due to a numerical error.",
+                extra={
+                    "error": str(e),
+                },
+                exc_info=True,
+            )
+            efficiency_slope = "N/A"
 
     return {
         "latency": latency,

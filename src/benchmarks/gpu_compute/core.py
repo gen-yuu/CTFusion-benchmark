@@ -66,6 +66,9 @@ class GpuComputeRunner:
                     "batch_sizes", self.run_settings["batch_sizes"]
                 )
 
+                logger.debug(
+                    f"Running {bench_conf['name']} with batch sizes: {loop_batch_sizes}"
+                )
                 for batch_size in loop_batch_sizes:
                     result = self._measure_single_run(
                         bench_conf,
@@ -77,9 +80,6 @@ class GpuComputeRunner:
 
                     # エラーが発生した場合、この曲線の残りのバッチサイズはスキップ
                     if result["error"] is not None:
-                        logger.warning(
-                            "Error occurred. Skipping remaining batch sizes."
-                        )
                         # 残りのバッチサイズ分、プログレスバーを進めておく
                         remaining_batches = (
                             len(loop_batch_sizes)
@@ -162,8 +162,9 @@ class GpuComputeRunner:
             )
 
         except Exception as e:
-            logger.warning(
-                f"Error on '{bench_conf['name']}' ({dtype_str}, bs={batch_size})",
+            logger.info(
+                f"Limit reached for '{bench_conf['name']}' "
+                f"({dtype_str}, bs={batch_size}). This is an expected boundary.",
                 extra={"error": str(e)},
             )
             result_dict["error"] = str(e)
