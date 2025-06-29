@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "ctfusion-benchmark"
+version         = "0.1.0"
+authors         = [{ name = "Yuki Gennai", email = "u763759d@ecs.osaka-u.ac.jp" }]
+description     = "A benchmark suite for evaluating GPU and Host performance for deep learning tasks, based on the CTFusion framework concept."
+readme          = "README.md"
+requires-python = ">=3.9"
+classifiers     = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent"
+]
+
+dependencies = [
+  "torch",
+  "pandas",
+  "PyYAML",
+  "py-cpuinfo",
+  "tqdm"
+]
+
+# Optional dependencies for development
+[project.optional-dependencies]
+dev = [
+  "black==24.4.2",
+  "isort==5.13.2",
+  "flake8==7.0.0"
+]
+
+[tool.black]
+line-length    = 88
+target-version = ["py39"]
+exclude = "/(\\.venv|\\.git|\\.mypy_cache|\\.pytest_cache|build|dist)/"
+
+[tool.isort]
+profile                = "black"
+line_length            = 88
+combine_as_imports     = true
+include_trailing_comma = true
+multi_line_output      = 3
+known_first_party      = ["ctfusion_benchmark"]
+virtual_env            = ".venv"
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore   = ["E203", "W503"]
+exclude         = [".git", ".venv", "__pycache__", "build", "dist"]
