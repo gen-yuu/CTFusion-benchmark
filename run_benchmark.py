@@ -8,9 +8,14 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from src.analysis.curve import calculate_4_metrics, calculate_data_transfer_features
+from src.analysis.curve import (
+    calculate_data_transfer_features,
+    calculate_gpu_compute_features,
+    calculate_host_compute_features,
+)
 from src.benchmarks.data_transfer.core import DataTransferRunner
 from src.benchmarks.gpu_compute.core import GpuComputeRunner
+from src.benchmarks.host_compute.core import HostComputeRunner
 from src.config import load_config
 from src.logger import setup_logging
 from src.utils import get_system_identifier
@@ -63,6 +68,7 @@ def main(args: argparse.Namespace):
         # データ取得
         logger.info("Starting Raw Data Acquisition")
         # --target 引数に応じて、実行するRunnerを決定
+        gpu_compute_raw_list, data_transfer_raw_list = [], []
         if args.target in ["all", "gpu_compute"]:
             logger.info("Starting GPU Compute Benchmarks")
             gpu_runner = GpuComputeRunner(config)
@@ -72,15 +78,22 @@ def main(args: argparse.Namespace):
             logger.info("Starting Data Transfer Benchmarks")
             transfer_runner = DataTransferRunner(config)
             data_transfer_raw_list = transfer_runner.run()
+
+        if args.target in ["all", "host_compute"]:
+            logger.info("Starting Host Compute Benchmarks")
+            host_runner = HostComputeRunner(config)
+            host_compute_raw_list = host_runner.run()
+
         logger.info("Complete. Acquired raw data.")
 
         # データ分析
         logger.info("Starting Feature Extraction")
         # gpu_computeの分析
+
         if gpu_compute_raw_list:
             df = pd.DataFrame(gpu_compute_raw_list)
             for (name, dtype), group_df in df.groupby(["benchmark_name", "data_type"]):
-                metrics = calculate_4_metrics(group_df)
+                metrics = calculate_gpu_compute_features(group_df)
                 features_list.append(
                     {
                         "group_name": "gpu_compute",
@@ -101,6 +114,21 @@ def main(args: argparse.Namespace):
                         "benchmark_name": name,
                         "direction": params["direction"],
                         "use_pinned_memory": params["use_pinned_memory"],
+                        **metrics,
+                    }
+                )
+        if host_compute_raw_list:
+            df = pd.DataFrame(host_compute_raw_list)
+            for name, group_df in df.groupby("benchmark_name"):
+                metrics = calculate_host_compute_features(group_df)
+
+                domain = group_df.iloc[0]["domain"]
+
+                features_list.append(
+                    {
+                        "group_name": "host_compute",
+                        "benchmark_name": name,
+                        "domain": domain,
                         **metrics,
                     }
                 )
@@ -126,6 +154,11 @@ def main(args: argparse.Namespace):
             if data_transfer_raw_list:
                 pd.DataFrame(data_transfer_raw_list).to_csv(
                     os.path.join(raws_dir, "data_transfer.csv"), index=False
+                )
+
+            if host_compute_raw_list:
+                pd.DataFrame(host_compute_raw_list).to_csv(
+                    os.path.join(raws_dir, "host_compute.csv"), index=False
                 )
 
             # 統合された特徴量データを保存

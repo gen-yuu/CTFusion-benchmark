@@ -8,7 +8,7 @@ import pandas as pd
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
 try:
-    from analysis.curve import calculate_4_metrics
+    from analysis.curve import calculate_gpu_compute_features
     from logger import setup_logging
 except ImportError as e:
     print(f"Error: Failed to import src modules. Error: {e}")
@@ -52,7 +52,7 @@ def main():
 
     for (name, dtype), group_df in grouped:
         logger.debug(f"Analyzing curve for {name} ({dtype})")
-        metrics = calculate_4_metrics(group_df)
+        metrics = calculate_gpu_compute_features(group_df)
         features_list.append({"benchmark_name": name, "data_type": dtype, **metrics})
 
     if not features_list:

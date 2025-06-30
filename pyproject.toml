@@ -20,7 +20,9 @@ dependencies = [
   "pandas",
   "PyYAML",
   "py-cpuinfo",
-  "tqdm"
+  "tqdm",
+  "pillow",
+  "psutil"
 ]
 
 # Optional dependencies for development

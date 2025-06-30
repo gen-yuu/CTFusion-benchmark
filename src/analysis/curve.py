@@ -7,7 +7,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def calculate_4_metrics(group_df: pd.DataFrame) -> Dict[str, Any]:
+def calculate_gpu_compute_features(group_df: pd.DataFrame) -> Dict[str, Any]:
     """
     単一の性能曲線データ（DataFrame）から4つの指標を計算する
 
@@ -17,10 +17,10 @@ def calculate_4_metrics(group_df: pd.DataFrame) -> Dict[str, Any]:
 
     Returns:
         Dict[str, Any]: 計算された4指標を含む辞書。
-            - `latency`: レイテンシ（`batch_size=1`での実行時間）
-            - `peak_throughput`: ピークスループット（性能曲線の最大値）
-            - `saturation_point`: 飽和点（ピーク性能の90%に達するバッチサイズ）
-            - `efficiency_slope`: 効率の傾き（性能曲線の立ち上がり具合）
+            - "latency": レイテンシ（`batch_size=1`での実行時間）
+            - "peak_throughput": ピークスループット（性能曲線の最大値）
+            - "saturation_point": 飽和点（ピーク性能の90%に達するバッチサイズ）
+            - "efficiency_slope": 効率の傾き（性能曲線の立ち上がり具合）
     """
     # エラーのあった行は除外して計算
     valid_df = group_df[group_df["throughput_items_per_sec"] >= 0].copy()
@@ -115,6 +115,8 @@ def calculate_data_transfer_features(group_df: pd.DataFrame) -> Dict[str, Any]:
 
     Returns:
         Dict[str, Any]: 抽出された2つの特徴量を含む辞書。
+        - "peak_bandwidth_gbps": ピーク帯域幅 (GB/s)
+        - "small_transfer_latency_ms": 小サイズレイテンシ (ms)
     """
     # エラーのある行は除外
     valid_df = group_df[group_df["error"].isnull()].copy()
@@ -136,4 +138,51 @@ def calculate_data_transfer_features(group_df: pd.DataFrame) -> Dict[str, Any]:
     return {
         "peak_bandwidth_gbps": peak_bandwidth_gbps,
         "small_transfer_latency_ms": small_transfer_latency_ms,
+    }
+
+
+def calculate_host_compute_features(group_df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Host computeの生データから3つの特徴量を抽出する
+
+    Args:
+        group_df (pd.DataFrame): 'benchmark_name'でグループ化されたDataFrame
+                                 'num_workers', 'value'カラムを持つ
+
+    Returns:
+        Dict[str, Any]: 抽出された3つの特徴量を含む辞書
+        - "peak_host_throughput": ピークスループット
+        - "single_worker_throughput": 単一ワーカー性能
+        - "scalability_factor": スケイラビリティ係数
+    """
+    # エラーのある行（スループットが負の値）は除外
+    valid_df = group_df[group_df["value"] >= 0].copy()
+    if valid_df.empty:
+        return {
+            "peak_host_throughput": -1.0,
+            "single_worker_throughput": -1.0,
+            "scalability_factor": -1.0,
+        }
+
+    # ピークスループット (peak_host_throughput)
+    peak_throughput = valid_df["value"].max()
+
+    # 単一ワーカー性能 (single_worker_throughput)
+    single_worker_row = valid_df[valid_df["num_workers"] == 1]
+    if not single_worker_row.empty:
+        single_worker_throughput = single_worker_row.iloc[0]["value"]
+    else:
+        # num_workers=1 のデータがない場合は -1 とする
+        single_worker_throughput = -1.0
+
+    # スケーラビリティ係数 (scalability_factor)
+    if single_worker_throughput > 0:
+        scalability_factor = peak_throughput / single_worker_throughput
+    else:
+        scalability_factor = 0.0
+
+    return {
+        "peak_host_throughput": peak_throughput,
+        "single_worker_throughput": single_worker_throughput,
+        "scalability_factor": scalability_factor,
     }

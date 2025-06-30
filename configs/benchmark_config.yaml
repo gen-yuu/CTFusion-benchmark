@@ -122,7 +122,17 @@ benchmark_groups:
           use_pinned_memory: true
           transfer_sizes_mb: [1, 4, 16, 64, 256, 512]
 
-  # ===== Pillar 3: Host Compute Benchmarks =====
+  # ===== ホスト計算系ベンチマークグループ =====
   - group_name: "host_compute"
-    enabled: false # 将来実装
+    enabled: true
     benchmarks:
+      - name: "Image_Preprocessing_Rate"
+        parameters:
+          # Factoryがどのベンチマーククラスを使うかを決定する
+          domain: "image_classification"
+          # 性能カーブを測定するためのワーカー数リスト
+          num_workers: "auto"
+          # ベンチマークで処理する画像の総数
+          num_images: 1000
+          # リサイズ後の画像サイズ
+          image_size: [224, 224]
