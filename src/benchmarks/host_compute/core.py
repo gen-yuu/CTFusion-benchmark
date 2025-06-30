@@ -69,58 +69,79 @@ class HostComputeRunner:
             return original_results_list
 
         benchmarks_to_run = group_config.get("benchmarks", [])
-        pbar = tqdm(
-            total=len(benchmarks_to_run), desc="Running Host Compute Benchmarks"
-        )
 
+        tasks_to_run = []
         for bench_conf in benchmarks_to_run:
             params = bench_conf.get("parameters", {})
-            domain = params.get("domain")
-            num_workers_config = params.get("num_workers", [1])
+            num_workers_config = params.get("num_workers", "auto")
+
             if num_workers_config == "auto":
                 num_workers_list = self._generate_auto_worker_list()
             elif isinstance(num_workers_config, list):
                 num_workers_list = num_workers_config
             else:
                 logger.warning(
-                    f"Invalid num_workers_list format: {num_workers_config}."
+                    f"Invalid num_workers_list format: {num_workers_config}.\
+                          Defaulting to [1]."
                 )
                 num_workers_list = [1]
 
+            for n_workers in num_workers_list:
+                tasks_to_run.append((bench_conf, n_workers))
+
+        pbar = tqdm(total=len(tasks_to_run), desc="Running Host Compute Benchmarks")
+
+        for bench_conf, n_workers in tasks_to_run:
+            params = bench_conf.get("parameters", {})
+            domain = params.get("domain")
             base_info = {
                 "group_name": "host_compute",
                 "benchmark_name": bench_conf["name"],
                 "domain": domain,
             }
 
+            benchmark_instance = None
             try:
                 benchmark_instance = create_host_benchmark(
                     domain, params, self.run_settings
                 )
+                logger.debug(
+                    f"Running {bench_conf['name']} with {n_workers} workers..."
+                )
+                throughput = benchmark_instance.measure_throughput(n_workers=n_workers)
 
-                for n_workers in num_workers_list:
-                    logger.info(
-                        f"Running {bench_conf['name']} with {n_workers} workers..."
-                    )
-                    throughput = benchmark_instance.measure_throughput(
-                        n_workers=n_workers
-                    )
-                    original_results_list.append(
-                        {
-                            **base_info,
-                            "num_workers": n_workers,
-                            "metric_type": "throughput_images_per_sec",
-                            "value": throughput,
-                            "error": None,
-                        }
-                    )
-
+                original_results_list.append(
+                    {
+                        **base_info,
+                        "num_workers": n_workers,
+                        "metric_type": "throughput_images_per_sec",
+                        "value": throughput,
+                        "error": None,
+                    }
+                )
             except Exception as e:
                 logger.error(
-                    f"Error on host benchmark '{bench_conf['name']}'", exc_info=True
+                    f"Error on host benchmark '{bench_conf['name']}' \
+                        with {n_workers} workers",
+                    extra={
+                        "error": str(e),
+                    },
+                    exc_info=True,
                 )
-                original_results_list.append({**base_info, "error": str(e)})
+                original_results_list.append(
+                    {
+                        **base_info,
+                        "num_workers": n_workers,
+                        "metric_type": "throughput_images_per_sec",
+                        "value": -1.0,
+                        "error": str(e),
+                    }
+                )
+            finally:
+                # 一時ファイルを削除するなどのクリーンアップ処理
+                if hasattr(benchmark_instance, "cleanup"):
+                    benchmark_instance.cleanup()
 
             pbar.update(1)
-        pbar.close()
+
         return original_results_list

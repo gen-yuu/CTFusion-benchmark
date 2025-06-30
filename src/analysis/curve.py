@@ -29,7 +29,7 @@ def calculate_gpu_compute_features(group_df: pd.DataFrame) -> Dict[str, Any]:
     # --- ストレステスト（データが1点）の場合の特別処理 ---
     if len(valid_df) <= 1:
         if len(valid_df) == 1:
-            latency = valid_df.iloc[0]["latency_sec"]
+            latency = valid_df.iloc[0]["latency_ms"]
             throughput = valid_df.iloc[0]["throughput_items_per_sec"]
         else:
             latency = -1.0

@@ -150,15 +150,15 @@ class GpuComputeRunner:
 
             # 経過時間をミリ秒で取得し、秒に変換
             elapsed_time_ms = start_event.elapsed_time(end_event)
-            total_time_sec = elapsed_time_ms / 1000
 
             # 1回あたりのレイテンシとスループットを計算
-            latency = total_time_sec / self.run_settings["timed_runs"]
-            throughput = batch_size / latency
+            latency_ms = elapsed_time_ms / self.run_settings["timed_runs"]
+            latency_sec = latency_ms / 1000
+            throughput = batch_size / latency_sec
 
             result_dict.update(
                 {
-                    "latency_sec": latency,
+                    "latency_ms": latency_ms,
                     "throughput_items_per_sec": throughput,
                 }
             )

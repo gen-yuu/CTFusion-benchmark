@@ -46,7 +46,7 @@ benchmark_groups:
         parameters:
           shape: [512, 28, 28]
 
-      # --- Conv2d (CNNコンポーネント) ---
+      # --- CNN拡張 ---
       - name: "Conv_Standard_k3s1"
         layer_type: "Conv2d"
         data_types: ["fp32", "fp16"]
@@ -80,13 +80,35 @@ benchmark_groups:
           stride: 2
           padding: 1
 
-      # --- BatchNorm2d (CNNコンポーネント) ---
       - name: "BatchNorm_Typical"
         layer_type: "BatchNorm2d"
         data_types: ["fp32", "fp16"]
         parameters:
           input_shape: [256, 56, 56]
           num_features: 256 # in_channels
+
+      # --- Transformer拡張 ---
+      - name: "MatMul_Attention_QK"
+        layer_type: "MatMul"
+        data_types: ["fp32", "fp16"]
+        parameters:
+          variant: "Batched_3D"
+          shape_a: [197, 64]
+          shape_b: [64, 197]
+
+      - name: "LayerNorm_ViT"
+        layer_type: "LayerNorm"
+        data_types: ["fp32", "fp16"]
+        parameters:
+          normalized_shape: [768]
+          input_shape: [197, 768]
+
+      - name: "Softmax_Attention"
+        layer_type: "Softmax"
+        data_types: ["fp32", "fp16"]
+        parameters:
+          dim: -1 # 最後の次元でSoftmaxを適用
+          input_shape: [12, 197, 197]
 
   # ======== データ転送系ベンチマークグループ ========
   - group_name: "data_transfer"
@@ -98,14 +120,14 @@ benchmark_groups:
         parameters:
           direction: "H2D"
           use_pinned_memory: false # ページング可能メモリを使用
-          transfer_sizes_mb: [1, 4, 16, 64, 256, 512]
+          transfer_sizes_mb: [1, 4, 16, 64, 256, 512, 1024]
 
       - name: "H2D_Pinned_Bandwidth"
         benchmark_type: "communication_bandwidth"
         parameters:
           direction: "H2D"
           use_pinned_memory: true # 最適化されたピン止めメモリを使用
-          transfer_sizes_mb: [1, 4, 16, 64, 256, 512]
+          transfer_sizes_mb: [1, 4, 16, 64, 256, 512, 1024]
 
       # --- Device-to-Host (D2H) 転送 ---
       - name: "D2H_Pageable_Bandwidth"
@@ -113,14 +135,14 @@ benchmark_groups:
         parameters:
           direction: "D2H"
           use_pinned_memory: false
-          transfer_sizes_mb: [1, 4, 16, 64, 256, 512]
+          transfer_sizes_mb: [1, 4, 16, 64, 256, 512, 1024]
 
       - name: "D2H_Pinned_Bandwidth"
         benchmark_type: "communication_bandwidth"
         parameters:
           direction: "D2H"
           use_pinned_memory: true
-          transfer_sizes_mb: [1, 4, 16, 64, 256, 512]
+          transfer_sizes_mb: [1, 4, 16, 64, 256, 512, 1024]
 
   # ===== ホスト計算系ベンチマークグループ =====
   - group_name: "host_compute"
