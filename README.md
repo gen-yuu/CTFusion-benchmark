@@ -7,7 +7,7 @@ It is designed to be a reproducible and extensible tool for research purposes.
 
 1. Clone this repository:
    ```bash
-   git clone [https://github.com/gen-yuu/CTFusion-benchmark.git](https://github.com/gen-yuu/CTFusion-benchmark.git)
+   git clone https://github.com/gen-yuu/CTFusion-benchmark.git
    cd ctfusion-benchmark
    ```
 2. Create a virtual environment and activate it:
