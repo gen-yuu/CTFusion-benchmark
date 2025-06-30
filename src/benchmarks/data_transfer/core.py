@@ -1,4 +1,5 @@
 import logging
+import sys
 from typing import Any, Dict, List
 
 import torch
@@ -112,7 +113,11 @@ class DataTransferRunner:
                 total_steps += len(sizes)  # 帯域幅測定の回数
                 total_steps += 1  # レイテンシ測定の回数
         pbar = tqdm(
-            total=len(benchmarks_to_run), desc="Running Data Transfer Benchmarks"
+            total=len(benchmarks_to_run),
+            desc="Running Data Transfer Benchmarks",
+            mininterval=1,
+            file=sys.stdout,
+            leave=False,
         )
 
         for bench_conf in benchmarks_to_run:

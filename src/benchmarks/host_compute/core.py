@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from typing import Any, Dict, List
 
 import psutil
@@ -89,7 +90,13 @@ class HostComputeRunner:
             for n_workers in num_workers_list:
                 tasks_to_run.append((bench_conf, n_workers))
 
-        pbar = tqdm(total=len(tasks_to_run), desc="Running Host Compute Benchmarks")
+        pbar = tqdm(
+            total=len(tasks_to_run),
+            desc="Running Host Compute Benchmarks",
+            mininterval=1,
+            file=sys.stdout,
+            leave=False,
+        )
 
         for bench_conf, n_workers in tasks_to_run:
             params = bench_conf.get("parameters", {})

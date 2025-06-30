@@ -1,4 +1,5 @@
 import logging
+import sys
 from typing import Any, Dict, List
 
 import torch
@@ -58,7 +59,13 @@ class GpuComputeRunner:
             * len(b["data_types"])
             for b in benchmarks_to_run
         )
-        pbar = tqdm(total=total_runs, desc="Running GPU Compute Benchmarks")
+        pbar = tqdm(
+            total=total_runs,
+            desc="Running GPU Compute Benchmarks",
+            mininterval=3,
+            file=sys.stdout,
+            leave=False,
+        )
 
         for bench_conf in benchmarks_to_run:
             for dtype_str in bench_conf["data_types"]:
