@@ -23,6 +23,7 @@ class GpuComputeRunner:
         self.run_settings = config["run_settings"]
         self.device = torch.device(self.run_settings["device"])
         self.layer_factory = LayerFactory()
+        logger.info(f"GpuComputeRunner initialized for device: '{self.device}'")
 
     def run(self) -> List[Dict[str, Any]]:
         """
@@ -34,7 +35,7 @@ class GpuComputeRunner:
         logger.info("Running gpu_compute benchmarks...")
         original_results_list = []
 
-        computation_group = next(
+        group_config = next(
             (
                 g
                 for g in self.config["benchmark_groups"]
@@ -43,13 +44,13 @@ class GpuComputeRunner:
             None,
         )
 
-        if not computation_group or not computation_group["enabled"]:
+        if not group_config or not group_config["enabled"]:
             logger.warning(
-                "Computation benchmark group is not defined or disabled. Skipping."
+                "gpu_compute benchmark group is not defined or disabled. Skipping."
             )
             return original_results_list
 
-        benchmarks_to_run = computation_group["benchmarks"]
+        benchmarks_to_run = group_config.get("benchmarks", [])
 
         # プログレスバーの準備
         total_runs = sum(
@@ -57,7 +58,7 @@ class GpuComputeRunner:
             * len(b["data_types"])
             for b in benchmarks_to_run
         )
-        pbar = tqdm(total=total_runs, desc="Running GPU Benchmarks")
+        pbar = tqdm(total=total_runs, desc="Running GPU Compute Benchmarks")
 
         for bench_conf in benchmarks_to_run:
             for dtype_str in bench_conf["data_types"]:
@@ -110,6 +111,7 @@ class GpuComputeRunner:
         dtype = torch.float16 if dtype_str == "fp16" else torch.float32
 
         result_dict = {
+            "group_name": "gpu_compute",
             "benchmark_name": bench_conf["name"],
             "data_type": dtype_str,
             "batch_size": batch_size,

@@ -103,3 +103,37 @@ def calculate_4_metrics(group_df: pd.DataFrame) -> Dict[str, Any]:
         "saturation_point": saturation_point,
         "efficiency_slope": efficiency_slope,
     }
+
+
+def calculate_data_transfer_features(group_df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    データ転送の生データから特徴量を抽出する。
+
+    Args:
+        group_df (pd.DataFrame): 'benchmark_name'でグループ化されたDataFrame。
+                                 'metric_type', 'value'カラムを持つ。
+
+    Returns:
+        Dict[str, Any]: 抽出された2つの特徴量を含む辞書。
+    """
+    # エラーのある行は除外
+    valid_df = group_df[group_df["error"].isnull()].copy()
+    if valid_df.empty:
+        return {"peak_bandwidth_gbps": -1.0, "small_transfer_latency_ms": -1.0}
+
+    # ピーク帯域幅の抽出
+    bandwidth_df = valid_df[valid_df["metric_type"] == "bandwidth_gbps"]
+    peak_bandwidth_gbps = (
+        bandwidth_df["value"].max() if not bandwidth_df.empty else -1.0
+    )
+
+    # 小サイズレイテンシの抽出
+    latency_df = valid_df[valid_df["metric_type"] == "latency_ms"]
+    small_transfer_latency_ms = (
+        latency_df.iloc[0]["value"] if not latency_df.empty else -1.0
+    )
+
+    return {
+        "peak_bandwidth_gbps": peak_bandwidth_gbps,
+        "small_transfer_latency_ms": small_transfer_latency_ms,
+    }

@@ -8,7 +8,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from src.analysis.curve import calculate_4_metrics
+from src.analysis.curve import calculate_4_metrics, calculate_data_transfer_features
+from src.benchmarks.data_transfer.core import DataTransferRunner
 from src.benchmarks.gpu_compute.core import GpuComputeRunner
 from src.config import load_config
 from src.logger import setup_logging
@@ -25,7 +26,6 @@ def main(args: argparse.Namespace):
         log_filepath = "run.log"
     setup_logging(log_level=log_level, log_filepath=log_filepath)
 
-    original_results_list = []
     features_list = []
     output_dir = None
 
@@ -40,7 +40,9 @@ def main(args: argparse.Namespace):
 
         # ディレクトリ名には抽象化IDを使用
         output_dir = f"results/{timestamp}_{abstract_system_id}"
-        os.makedirs(output_dir, exist_ok=True)
+        raws_dir = os.path.join(output_dir, "raws")
+        os.makedirs(raws_dir, exist_ok=True)
+
         logger.info(f"Created output directory: {output_dir}")
 
         metadata = {
@@ -60,26 +62,49 @@ def main(args: argparse.Namespace):
 
         # データ取得
         logger.info("Starting Raw Data Acquisition")
-        runner = GpuComputeRunner(config)
-        original_results_list = runner.run()
-        logger.info(f"Complete. Acquired {len(original_results_list)} data points")
+        # --target 引数に応じて、実行するRunnerを決定
+        if args.target in ["all", "gpu_compute"]:
+            logger.info("Starting GPU Compute Benchmarks")
+            gpu_runner = GpuComputeRunner(config)
+            gpu_compute_raw_list = gpu_runner.run()
 
-        if not original_results_list:
-            logger.warning("No data was generated. Exiting")
-            return
+        if args.target in ["all", "data_transfer"]:
+            logger.info("Starting Data Transfer Benchmarks")
+            transfer_runner = DataTransferRunner(config)
+            data_transfer_raw_list = transfer_runner.run()
+        logger.info("Complete. Acquired raw data.")
 
         # データ分析
         logger.info("Starting Feature Extraction")
-        original_df = pd.DataFrame(original_results_list)
-        grouped = original_df.groupby(["benchmark_name", "data_type"])
-
-        for (name, dtype), group_df in grouped:
-            logger.debug(f"Analyzing curve for {name} ({dtype})")
-            metrics = calculate_4_metrics(group_df)
-            features_list.append(
-                {"benchmark_name": name, "data_type": dtype, **metrics}
-            )
-        logger.info(f"Complete. Extracted {len(features_list)} feature sets")
+        # gpu_computeの分析
+        if gpu_compute_raw_list:
+            df = pd.DataFrame(gpu_compute_raw_list)
+            for (name, dtype), group_df in df.groupby(["benchmark_name", "data_type"]):
+                metrics = calculate_4_metrics(group_df)
+                features_list.append(
+                    {
+                        "group_name": "gpu_compute",
+                        "benchmark_name": name,
+                        "data_type": dtype,
+                        **metrics,
+                    }
+                )
+        # data_transferの分析
+        if data_transfer_raw_list:
+            df = pd.DataFrame(data_transfer_raw_list)
+            for name, group_df in df.groupby("benchmark_name"):
+                metrics = calculate_data_transfer_features(group_df)
+                params = group_df.iloc[0]
+                features_list.append(
+                    {
+                        "group_name": "data_transfer",
+                        "benchmark_name": name,
+                        "direction": params["direction"],
+                        "use_pinned_memory": params["use_pinned_memory"],
+                        **metrics,
+                    }
+                )
+        logger.info(f"Complete. Extracted {len(features_list)} feature sets.")
 
     except Exception as e:
         logger.error(
@@ -91,36 +116,25 @@ def main(args: argparse.Namespace):
     finally:
         logger.info("Finalizing and Saving Results")
         if output_dir:
+            # gpu_compute の生データを保存
+            if gpu_compute_raw_list:
+                pd.DataFrame(gpu_compute_raw_list).to_csv(
+                    os.path.join(raws_dir, "gpu_compute.csv"), index=False
+                )
 
-            if original_results_list:
-                try:
-                    original_output_path = os.path.join(output_dir, "raw_data.csv")
-                    logger.info(f"Saving raw data to {original_output_path}..")
-                    pd.DataFrame(original_results_list).to_csv(
-                        original_output_path, index=False
-                    )
-                    logger.info("Raw data saved successfully")
-                except Exception as e:
-                    logger.error(
-                        "Failed to save raw data",
-                        extra={"error": str(e)},
-                        exc_info=True,
-                    )
+            # data_transfer の生データを保存
+            if data_transfer_raw_list:
+                pd.DataFrame(data_transfer_raw_list).to_csv(
+                    os.path.join(raws_dir, "data_transfer.csv"), index=False
+                )
 
+            # 統合された特徴量データを保存
             if features_list:
-                try:
-                    features_output_path = os.path.join(output_dir, "features.csv")
-                    logger.info(f"Saving feature data to {features_output_path}..")
-                    pd.DataFrame(features_list).to_csv(
-                        features_output_path, index=False
-                    )
-                    logger.info("Feature data saved successfully")
-                except Exception as e:
-                    logger.error(
-                        "Failed to save feature data",
-                        extra={"error": str(e)},
-                        exc_info=True,
-                    )
+                pd.DataFrame(features_list).to_csv(
+                    os.path.join(output_dir, "features.csv"), index=False
+                )
+
+            logger.info(f"All results saved in {output_dir}")
         else:
             logger.error("Output directory was not created. Cannot save results.")
 
@@ -148,6 +162,18 @@ if __name__ == "__main__":
         "--log-to-file",
         action="store_true",
         help="Enable logging to a file inside the run directory.",
+    )
+    parser.add_argument(
+        "--target",
+        type=str,
+        default="all",
+        choices=[
+            "all",
+            "gpu_compute",
+            "data_transfer",
+            "host_compute",
+        ],
+        help="Specify which benchmark group to run.",
     )
     args = parser.parse_args()
 

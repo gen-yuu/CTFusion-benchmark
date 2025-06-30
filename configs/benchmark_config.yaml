@@ -1,59 +1,55 @@
-
 # ===================================================================
 # 実行設定
 # ===================================================================
 run_settings:
-  device: 'cuda'
-  warmup_runs: 5        # ウォームアップ実行回数
-  timed_runs: 50          # 時間測定を行う実行回数
+  device: "cuda"
+  warmup_runs: 5 # ウォームアップ実行回数
+  timed_runs: 50 # 時間測定を行う実行回数
   batch_sizes: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024] # 性能曲線を測定するためのバッチサイズリスト
-
 
 # ===================================================================
 # ベンチマークグループの定義
 # ===================================================================
 benchmark_groups:
-
-  # ===== 演算系ベンチマークグループ =====
-  - group_name: 'gpu_compute'
-    enabled: true  
+  # ===== GPU演算系ベンチマークグループ =====
+  - group_name: "gpu_compute"
+    enabled: true
     benchmarks:
       # --- MatMul (計算律速) ---
-      - name: 'MatMul_Square_4096'
-        layer_type: 'MatMul'
-        data_types: ['fp32', 'fp16']
-        # グローバル設定を上書きしてバッチサイズ1でのみ実行
-        batch_sizes: [1]
+      - name: "MatMul_Square_4096"
+        layer_type: "MatMul"
+        data_types: ["fp32", "fp16"]
+        batch_sizes: [1] # グローバル設定を上書きしてバッチサイズ1でのみ実行
         parameters:
-          variant: 'StressTest_2D'
+          variant: "StressTest_2D"
           shape_a: [4096, 4096]
           shape_b: [4096, 4096]
 
-      - name: 'MatMul_Batched_512'
-        layer_type: 'MatMul'
-        data_types: ['fp32', 'fp16']
+      - name: "MatMul_Batched_512"
+        layer_type: "MatMul"
+        data_types: ["fp32", "fp16"]
         parameters:
-          variant: 'Batched_3D'
+          variant: "Batched_3D"
           shape_a: [512, 512]
           shape_b: [512, 512]
-      
+
       # --- Add (メモリ律速) ---
-      - name: 'Add_ShallowLayer'
-        layer_type: 'Add'
-        data_types: ['fp32', 'fp16']
+      - name: "Add_ShallowLayer"
+        layer_type: "Add"
+        data_types: ["fp32", "fp16"]
         parameters:
           shape: [64, 224, 224]
 
-      - name: 'Add_DeepLayer'
-        layer_type: 'Add'
-        data_types: ['fp32', 'fp16']
+      - name: "Add_DeepLayer"
+        layer_type: "Add"
+        data_types: ["fp32", "fp16"]
         parameters:
           shape: [512, 28, 28]
 
       # --- Conv2d (CNNコンポーネント) ---
-      - name: 'Conv_Standard_k3s1'
-        layer_type: 'Conv2d'
-        data_types: ['fp32', 'fp16']
+      - name: "Conv_Standard_k3s1"
+        layer_type: "Conv2d"
+        data_types: ["fp32", "fp16"]
         parameters:
           input_shape: [256, 56, 56] # (C, H, W)
           in_channels: 256
@@ -62,9 +58,9 @@ benchmark_groups:
           stride: 1
           padding: 1
 
-      - name: 'Conv_Bottleneck_k1s1'
-        layer_type: 'Conv2d'
-        data_types: ['fp32', 'fp16']
+      - name: "Conv_Bottleneck_k1s1"
+        layer_type: "Conv2d"
+        data_types: ["fp32", "fp16"]
         parameters:
           input_shape: [256, 56, 56]
           in_channels: 256
@@ -73,9 +69,9 @@ benchmark_groups:
           stride: 1
           padding: 0 # k=1, s=1の場合、通常paddingは0
 
-      - name: 'Conv_Downsampling_k3s2'
-        layer_type: 'Conv2d'
-        data_types: ['fp32', 'fp16']
+      - name: "Conv_Downsampling_k3s2"
+        layer_type: "Conv2d"
+        data_types: ["fp32", "fp16"]
         parameters:
           input_shape: [256, 56, 56]
           in_channels: 256
@@ -83,22 +79,50 @@ benchmark_groups:
           kernel_size: 3
           stride: 2
           padding: 1
-          
+
       # --- BatchNorm2d (CNNコンポーネント) ---
-      - name: 'BatchNorm_Typical'
-        layer_type: 'BatchNorm2d'
-        data_types: ['fp32', 'fp16']
+      - name: "BatchNorm_Typical"
+        layer_type: "BatchNorm2d"
+        data_types: ["fp32", "fp16"]
         parameters:
           input_shape: [256, 56, 56]
           num_features: 256 # in_channels
 
-  # ======== 2. 通信系ベンチマークグループ (設計確定後に有効化) ========
-  - group_name: 'cdata_transfer'
-    enabled: false # 現時点では実行しない
+  # ======== データ転送系ベンチマークグループ ========
+  - group_name: "data_transfer"
+    enabled: true
     benchmarks:
-      # - name: H2D_Large_Tensor
-      #   ... (将来の設計がここに入る) ...
+      # --- Host-to-Device転送 ---
+      - name: "H2D_Pageable_Bandwidth"
+        benchmark_type: "communication_bandwidth"
+        parameters:
+          direction: "H2D"
+          use_pinned_memory: false # ページング可能メモリを使用
+          transfer_sizes_mb: [1, 4, 16, 64, 256, 512]
+
+      - name: "H2D_Pinned_Bandwidth"
+        benchmark_type: "communication_bandwidth"
+        parameters:
+          direction: "H2D"
+          use_pinned_memory: true # 最適化されたピン止めメモリを使用
+          transfer_sizes_mb: [1, 4, 16, 64, 256, 512]
+
+      # --- Device-to-Host (D2H) 転送 ---
+      - name: "D2H_Pageable_Bandwidth"
+        benchmark_type: "communication_bandwidth"
+        parameters:
+          direction: "D2H"
+          use_pinned_memory: false
+          transfer_sizes_mb: [1, 4, 16, 64, 256, 512]
+
+      - name: "D2H_Pinned_Bandwidth"
+        benchmark_type: "communication_bandwidth"
+        parameters:
+          direction: "D2H"
+          use_pinned_memory: true
+          transfer_sizes_mb: [1, 4, 16, 64, 256, 512]
+
   # ===== Pillar 3: Host Compute Benchmarks =====
-  - group_name: 'host_compute'
+  - group_name: "host_compute"
     enabled: false # 将来実装
     benchmarks:
