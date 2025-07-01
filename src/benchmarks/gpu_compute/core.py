@@ -122,7 +122,7 @@ class GpuComputeRunner:
             "benchmark_name": bench_conf["name"],
             "data_type": dtype_str,
             "batch_size": batch_size,
-            "latency_sec": -1.0,
+            "latency_ms": -1.0,
             "throughput_items_per_sec": -1.0,
             "error": None,
         }

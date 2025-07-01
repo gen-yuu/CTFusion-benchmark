@@ -13,7 +13,7 @@ def calculate_gpu_compute_features(group_df: pd.DataFrame) -> Dict[str, Any]:
 
     Args:
         group_df (pd.DataFrame): 'benchmark_name'と'data_type'でグループ化されたDataFrame。
-            'batch_size', 'latency_sec', 'throughput_items_per_sec'カラムを持つ
+            'batch_size', 'latency_ms', 'throughput_items_per_sec'カラムを持つ
 
     Returns:
         Dict[str, Any]: 計算された4指標を含む辞書。
@@ -46,7 +46,7 @@ def calculate_gpu_compute_features(group_df: pd.DataFrame) -> Dict[str, Any]:
     # --- 4指標の計算 ---
     # レイテンシ (latency)
     bs1_row = valid_df[valid_df["batch_size"] == 1]
-    latency = bs1_row.iloc[0]["latency_sec"] if not bs1_row.empty else -1.0
+    latency = bs1_row.iloc[0]["latency_ms"] if not bs1_row.empty else -1.0
     # ピークスループット (peak_throughput)
     peak_throughput = valid_df["throughput_items_per_sec"].max()
 
