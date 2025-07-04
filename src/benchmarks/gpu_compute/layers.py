@@ -107,6 +107,28 @@ class LayerFactory:
                 )
                 return module, input_tensor
 
+            elif layer_type == "LayerNorm":
+                shape = [batch_size] + parameters["input_shape"]
+                input_tensor = torch.randn(*shape, device=device, dtype=dtype)
+
+                module = nn.LayerNorm(
+                    normalized_shape=parameters["normalized_shape"],
+                ).to(
+                    device=device,
+                    dtype=dtype,
+                )
+                return module, input_tensor
+
+            elif layer_type == "Softmax":
+                shape = [batch_size] + parameters["input_shape"]
+                input_tensor = torch.randn(*shape, device=device, dtype=dtype)
+
+                module = nn.Softmax(dim=parameters.get("dim", -1)).to(
+                    device=device,
+                    dtype=dtype,
+                )
+                return module, input_tensor
+
             else:
                 # 未知のレイヤタイプが指定された場合はエラーを送出
                 logger.warning(f"Unknown layer type: {layer_type}")

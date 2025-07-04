@@ -1,4 +1,5 @@
 import logging
+import sys
 from typing import Any, Dict, List
 
 import torch
@@ -105,8 +106,18 @@ class DataTransferRunner:
             return original_results_list
 
         benchmarks_to_run = group_config.get("benchmarks", [])
+        total_steps = 0
+        for b_conf in benchmarks_to_run:
+            sizes = b_conf.get("parameters", {}).get("transfer_sizes_mb", [])
+            if sizes:
+                total_steps += len(sizes)  # 帯域幅測定の回数
+                total_steps += 1  # レイテンシ測定の回数
         pbar = tqdm(
-            total=len(benchmarks_to_run), desc="Running Data Transfer Benchmarks"
+            total=len(benchmarks_to_run),
+            desc="Running Data Transfer Benchmarks",
+            mininterval=1,
+            file=sys.stdout,
+            leave=False,
         )
 
         for bench_conf in benchmarks_to_run:
@@ -131,7 +142,7 @@ class DataTransferRunner:
                     cpu_tensor_full = cpu_tensor_full.pin_memory()
                 gpu_tensor_full = torch.randn_like(cpu_tensor_full, device=self.device)
 
-            for size_mb in transfer_sizes:
+            for i, size_mb in enumerate(transfer_sizes):
                 try:
                     num_elements = (size_mb * 1024 * 1024) // 4
                     cpu_tensor_slice = cpu_tensor_full[:num_elements]
@@ -164,6 +175,7 @@ class DataTransferRunner:
                             "error": None,
                         }
                     )
+                    pbar.update(1)
 
                 except Exception as e:
                     logger.warning(
@@ -180,6 +192,12 @@ class DataTransferRunner:
                             "error": str(e),
                         }
                     )
+                    pbar.update(1)
+
+                    # 残りのステップ数を計算
+                    remaining_steps = len(transfer_sizes) - (i + 1)
+                    if remaining_steps > 0:
+                        pbar.update(remaining_steps)
                     logger.warning(
                         "CUDA OOM detected. Skipping larger sizes for this benchmark."
                     )
@@ -212,6 +230,7 @@ class DataTransferRunner:
                             "error": None,
                         }
                     )
+                    pbar.update(1)
 
                 except Exception as e:
                     logger.warning(
@@ -228,7 +247,7 @@ class DataTransferRunner:
                             "error": str(e),
                         }
                     )
+                    pbar.update(1)
 
-            pbar.update(1)
         pbar.close()
         return original_results_list

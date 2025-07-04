@@ -1,4 +1,5 @@
 import logging
+import sys
 from typing import Any, Dict, List
 
 import torch
@@ -58,7 +59,13 @@ class GpuComputeRunner:
             * len(b["data_types"])
             for b in benchmarks_to_run
         )
-        pbar = tqdm(total=total_runs, desc="Running GPU Compute Benchmarks")
+        pbar = tqdm(
+            total=total_runs,
+            desc="Running GPU Compute Benchmarks",
+            mininterval=3,
+            file=sys.stdout,
+            leave=False,
+        )
 
         for bench_conf in benchmarks_to_run:
             for dtype_str in bench_conf["data_types"]:
@@ -115,7 +122,7 @@ class GpuComputeRunner:
             "benchmark_name": bench_conf["name"],
             "data_type": dtype_str,
             "batch_size": batch_size,
-            "latency_sec": -1.0,
+            "latency_ms": -1.0,
             "throughput_items_per_sec": -1.0,
             "error": None,
         }
@@ -150,15 +157,15 @@ class GpuComputeRunner:
 
             # 経過時間をミリ秒で取得し、秒に変換
             elapsed_time_ms = start_event.elapsed_time(end_event)
-            total_time_sec = elapsed_time_ms / 1000
 
             # 1回あたりのレイテンシとスループットを計算
-            latency = total_time_sec / self.run_settings["timed_runs"]
-            throughput = batch_size / latency
+            latency_ms = elapsed_time_ms / self.run_settings["timed_runs"]
+            latency_sec = latency_ms / 1000
+            throughput = batch_size / latency_sec
 
             result_dict.update(
                 {
-                    "latency_sec": latency,
+                    "latency_ms": latency_ms,
                     "throughput_items_per_sec": throughput,
                 }
             )
