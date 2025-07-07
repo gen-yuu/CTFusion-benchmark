@@ -25,10 +25,10 @@ WORKDIR /app
 
 RUN python -m pip install --no-cache-dir --upgrade pip
 
-COPY pyproject.toml .
-
-RUN pip install --no-cache-dir .
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+RUN pip install --no-cache-dir .
 
 # CMD ["python", "run_benchmark.py"]
